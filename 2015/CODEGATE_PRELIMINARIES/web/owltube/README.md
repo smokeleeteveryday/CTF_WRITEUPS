@@ -40,7 +40,7 @@ The cookie value passed to set_cookie is set, upon successful login, to a json r
 
 The vulnerability here resides in the fact that the cookie is encrypted using AES in Cipher Block Chaining (CBC) mode. In CBC mode, each block of plaintext is XORed to the previous block of ciphertext before being encrypted, using a random IV for the first block of plaintext. Conversely, upon decryption, each block of ciphertext is decrypted and subsequently XORed to the previous block of ciphertext (or the IV in case of the first block) to yield the final decrypted block.
 
-![alt cbc_decryption](CBC_decryption.svg)
+![alt cbc_decryption](cbc_decryption.png)
 
 Since CBC mode comes with no authentication mechanism (eg. a MAC, signature, etc.) the application has no means to detect if the encrypted data it processes has been altered or not by a malicious client. This allows us to perform a bitflipping attack on our encrypted cookie. Flipping a byte in a ciphertext block will corrupt the corresponding decrypted block but produce a corresponding flip in the byte at the same block-offset within the subsequent block. Hence, given a known plaintext byte at offset i in the plaintext, we can alter the byte at offset i in the final decryption result by flipping byte (i-block_size) of the ciphertext (or byte i of the IV if i < block_size).
 
