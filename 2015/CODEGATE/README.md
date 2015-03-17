@@ -1,4 +1,4 @@
-# CodeGate General (preliminaries) CTF 2015 write-ups
+# CodeGate General CTF 2015 write-ups
 
 ## Solved
 

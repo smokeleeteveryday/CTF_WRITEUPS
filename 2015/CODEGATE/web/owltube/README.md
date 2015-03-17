@@ -1,4 +1,4 @@
-# CodeGate General (preliminaries) CTF 2015: Owltube
+# CodeGate General CTF 2015: Owltube
 
 **Category:** Web
 **Points:** 400
