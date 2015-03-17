@@ -160,10 +160,13 @@ The [final exploit](solution/owltube_exploit.py) is as follows:
 
 Which will yield the following result:
 
+>```bash
 >$ python owltube_exploit.py
 >[+]Cookie: ["YOk8jak/YUSlKfeEYkJWfkqVJ0kui19L4OVjlO8buQAKYbVZT4dyIeiyKATU/BK8"]
 >[+]IV: [60e93c8da93f6144a529f7846242567e]
 >[+]Ciphertext: [4a9527492e8b5f4be0e56394ef1bb9000a61b5594f877221e8b22804d4fc12bc]
+>```
+>```html
 ><html>
 ><head>
 >        <title>Owltube - index</title>
@@ -172,6 +175,7 @@ Which will yield the following result:
 >
 >               <span class="badge badge-important">1</span><span class="btn btn-link" onclick="play('the_owls_are_watching_again')">THIS IS THE KEY</span></br></br>
 >(...)
+>```
 
 Giving the flag: 
 
