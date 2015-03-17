@@ -46,7 +46,7 @@ Since CBC mode comes with no authentication mechanism (eg. a MAC, signature, etc
 
 Since the decryption result must always be a valid json string, we cannot afford corrupting the ciphertext itself and hence are restricted to flipping the first 16 bytes of the plaintext by corrupting the IV only. We can set bytes at offsets 0..15 in the decryption result to our target text by corrupting the IV in the following manner:
 
->``python
+>```python
 >iv[i] = chr(ord(known_plaintext[i]) ^ ord(iv[i]) ^ ord(target_text[i]))
 >```
 
