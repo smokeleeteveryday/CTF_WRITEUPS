@@ -4,6 +4,9 @@
 **Points:** 400
 **Description:** 
 
+>http://54.65.205.135/owlur/
+>if you use a web scanner, your IP will get banned no bruteforce required, take it easy
+
 ## Write-up
 
 The challenge was a basic PHP web application, the index.php tells us that this is an image sharing site for owl pictures and there's an upload box on the page.
