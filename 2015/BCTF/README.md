@@ -2,4 +2,4 @@
 
 ## Solved
 
-* [crypto/weak_enc](crypt/weak_enc)
+* [crypto/weak_enc](crypto/weak_enc)
