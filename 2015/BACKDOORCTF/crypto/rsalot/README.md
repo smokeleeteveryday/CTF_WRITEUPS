@@ -10,7 +10,7 @@
 
 ## Write-up
 
-The challenge consists of a collection of 100 RSA public keys and an RSA-encrypted flag file. Given the large number of RSA public keys we immediately suspected at least a single pair would have a moduli n with a common prime factor. This poses a problem because, given two RSA public keys (n1, e1), (n2, e2) where n1 = p\*q1 and n2 = p\*q2, we can trivially factor n1 and n2 by calculating the greatest common divisor of n1 and n2 gcd(n1, n2) = p and hence obtain the corresponding private keys [[1](https://factorable.net/faq.html)], [[2](http://www.hyperelliptic.org/tanja/vortraege/facthacks-RSA.pdf)].
+The challenge consists of a collection of 100 RSA public keys and an RSA-encrypted flag file. Given the large number of RSA public keys we immediately suspected at least a single pair would have a moduli n with a common prime factor. This poses a problem because, given two RSA public keys (n1, e1), (n2, e2) where n1 = p\*q1 and n2 = p\*q2, we can trivially factor n1 and n2 by calculating the greatest common divisor of n1 and n2: gcd(n1, n2) = p and hence obtain the corresponding private keys [[1](https://factorable.net/faq.html)], [[2](http://www.hyperelliptic.org/tanja/vortraege/facthacks-RSA.pdf)].
 
 We cooked up a [quick & dirty script](solution/rsalot.py) which checked all public key pairs for a common prime factor and if it found one (or more) it would try to decrypt to ciphertext with it:
 
