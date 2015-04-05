@@ -100,5 +100,5 @@ And we got the flag:
 > [+] Recieving all data: Done (138B)
 > [*] Closed connection to hack.bckdr.in port 8002
 > ECHO: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}\x85\x0
-> 96f674623c2c378f89700aa46f02cf3b311489f0facdfac6fd5885d4bc1a129a
+> {flag removed upon request of backdoorCTF admins ;)}
 >```
