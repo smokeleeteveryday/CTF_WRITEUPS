@@ -17,7 +17,7 @@ The challenge consists of a file containing a collection of tuples:
 >(...)
 
 The first line gives us a hint about the encryption scheme as the parameters N, e and c are usually used to denote the modulus, public exponent and ciphertext in RSA.
-Looking at the tuples what immediately stands out is the size of the public exponents (which are usually one of the fermat primes) which hints at the possibility for Wiener's attack (sometimes a large public exponent is an indication of a small private exponent). Iterating over the tuples and checking each for potential vulnerability to Wiener's attack eventually [proves successful](solution/curious_crack.py):
+Looking at the tuples what immediately stands out is the size of the public exponents (which are usually one of the fermat primes) which hints at the possibility for [Wiener's attack](http://en.wikipedia.org/wiki/Wiener%27s_attack) (sometimes a large public exponent is an indication of a small private exponent). Iterating over the tuples and checking each for potential vulnerability to Wiener's attack eventually [proves successful](solution/curious_crack.py):
 
 >```python
 >#!/usr/bin/python
