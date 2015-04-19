@@ -119,5 +119,5 @@ Which gave the following result:
 >$ python rsalot.py
 >[+]Got private key from common modulus between (64) and (87)
 >[+]Got private key from common modulus between (87) and (64)
->the_flag_is_b767b9d1fe02eb1825de32c6dacf4c2ef78c738ab0c498013347f4ea1e95e8fa
+>{flag removed upon request of backdoorCTF admins ;)}
 >```

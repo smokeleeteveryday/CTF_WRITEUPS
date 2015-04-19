@@ -90,5 +90,5 @@ Which gives us:
 
 >```bash
 >$ python rsanne.py
->the_flag_is_e4972e14a8bd2430bd52d41bad8060368c2fa4f56ef6deddf1b377773a761b1a
+>{flag removed upon request of backdoorCTF admins ;)}
 >```

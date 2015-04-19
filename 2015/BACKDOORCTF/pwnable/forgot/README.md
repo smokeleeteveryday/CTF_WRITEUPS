@@ -263,5 +263,5 @@ Which produces the following output:
 >> 
 >[+] Recieving all data: Done (65B)
 >[*] Closed connection to hack.bckdr.in port 8009
->ebe2c4abf85c239c7bd0385a685c460b2c5fe1dcdb2236f87dfef826bb690adf
+>{flag removed upon request of backdoorCTF admins ;)}
 >```
