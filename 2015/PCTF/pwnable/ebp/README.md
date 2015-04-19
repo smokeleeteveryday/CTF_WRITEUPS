@@ -1,4 +1,4 @@
-# Plaid CTF 2015: Strength
+# Plaid CTF 2015: EBP
 
 **Category:** EBP
 **Points:** 160
