@@ -11,7 +11,6 @@
 
 ----------
 ## Write-up
-### First look
 
 The lotto script effectively does the following:
 
