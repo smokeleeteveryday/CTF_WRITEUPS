@@ -1,4 +1,4 @@
-# VolgaCTF Quals 2015: Rsa
+# VolgaCTF Quals 2015: lcg
 
 ----------
 ## Challenge details
