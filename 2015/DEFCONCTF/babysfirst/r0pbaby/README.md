@@ -191,7 +191,7 @@ So the first QWORD of our input overwrites the old RBP and the second QWORD over
 2. The address of the string "/bin/sh"
 3. The address of the function system()
 
-Giving us the rop-chain: <RBP overwrite><@RDI gadget><@/bin/sh><@system>
+Giving us the rop-chain: <RBP overwrite>< RDI gadget addr ></bin/sh addr >< system addr >
 
 Luckily all three can be found in libc. Instead of using [a tool](https://github.com/0vercl0k/rp) to find gadgets we relied on the fact that our local and the remote libc versions are identical and simply attached a debugger and searched memory for an offset from the given libc base address. A more robust approach would try to narrow down the specific libc version using function address difference and then dynamically resolve those addresses from the retrieved version.
 
