@@ -579,7 +579,7 @@ Let's check what kind of file we have here:
 
 When unpacking it we get a pdf called [gefelicteerd.pdf](challenge/gefelicteerd.pdf) and an archive called [bonus.tar.gz](bonus.tar.gz) which is a bonus challenge. When opening the pdf (the filename means, slightly misspelled, 'congratulations' in dutch) we see some recruitment message with a 'redacted' part:
 
-![alt feli](feli.png)
+![alt gefeli](gefeli.png)
 
 Simply copy/pasting from below the redacted part gives us:
 
