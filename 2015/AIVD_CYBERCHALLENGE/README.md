@@ -644,3 +644,7 @@ Which gives us a sUp3R s3Cr3T phone number you can call or write on toilet stall
 >$./gefeli_decrypt.py
 >+31610702301
 >```
+
+# BONUS
+
+As for the bonus part, [here's our write-up](BONUS.md).
