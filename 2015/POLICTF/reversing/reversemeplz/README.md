@@ -7,7 +7,7 @@
 | PoliCTF 2015 | reversemeplz | Reversing |    200 |
 
 **Description:**
->*Last month I was trying to simplify an algorithm.. and I found how to mess up a source really really bad. And then this challenge is born. Maybe is really simple or maybe is so hard that all of you will give up. (Good luck!)[challenge/challenge]*
+>*Last month I was trying to simplify an algorithm.. and I found how to mess up a source really really bad. And then this challenge is born. Maybe is really simple or maybe is so hard that all of you will give up. [Good luck!](challenge/challenge)*
 
 ----------
 ## Write-up
