@@ -9,3 +9,4 @@
 * [web/johnthereferee](web/johnthereferee)
 * [web/magicchall](web/magicchall)
 * [forensics/johninthemiddle](forensics/johninthemiddle)
+* [forensics/heshungry](forensics/heshungry)
