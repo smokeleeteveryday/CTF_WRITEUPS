@@ -15,3 +15,10 @@
 * [misc/welcome](misc/welcome)
 * [ppc/patternlock](ppc/patternlock)
 * [ppc/alphabetprogramming](ppc/alphabetprogramming)
+
+## Solved post-CTF
+
+These challenges were solved shortly after CTF time ran out
+
+* [reversing/simple_hash](reversing/simple_hash)
+* [crypto/alicegame](crypto/alicegame)
