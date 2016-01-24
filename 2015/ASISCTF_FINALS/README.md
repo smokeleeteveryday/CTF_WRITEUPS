@@ -2,11 +2,11 @@
 
 ## Solved
 
-* [pwn/shop1](pwn/shop1)
+* pwn/shop1
 * [reverse/license](reverse/license)
 * [reverse/fake](reverse/fake)
 * [reverse/asishash](reverse/asishash)
 * [crypto/bodu](crypto/bodu)
-* [misc/flaghunter](misc/flaghunter)
-* [misc/meowmeow](misc/meowmeow)
-* [trivia/calmdown](trivia/calmdown)
+* misc/flaghunter
+* misc/meowmeow
+* trivia/calmdown
