@@ -1,6 +1,5 @@
 # MMACTF 2015: Signer and Verifier
 
-----------
 ## Challenge details
 | Contest        | Challenge     | Category  | Points |
 |:---------------|:--------------|:----------|-------:|
@@ -11,7 +10,6 @@
 >
 >*Verifier: nc cry1.chal.mmactf.link 44816*
 
-----------
 ## Write-up
 
 This challenge consists of two services, a signer and a verifier. When we connect to the verifier we see the following:
