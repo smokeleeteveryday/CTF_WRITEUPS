@@ -133,3 +133,6 @@ MMA{homomorphic_challengers}
 
 [*] Closed connection to cry1.chal.mmactf.link port 44816
 ```
+
+## Solution
+The flag: `MMA{{homomorphic_challengers}`
