@@ -5,5 +5,5 @@
 * [crypto/curious](crypto/curious)
 * [crypto/strength](crypto/strength)
 * [pwnable/ebp](pwnable/ebp)
-* [forensics/unknown](forensics/unknown)
+* forensics/unknown (no write-up available)
 * [reversing/clifford](reversing/clifford)
