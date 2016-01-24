@@ -135,4 +135,4 @@ MMA{homomorphic_challengers}
 ```
 
 ## Solution
-The flag: `MMA{{homomorphic_challengers}`
+`MMA{{homomorphic_challengers}`
