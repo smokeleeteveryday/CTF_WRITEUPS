@@ -14,7 +14,7 @@ CTFtime event: [CTFtime](https://ctftime.org/event/280)
 |:----------|:-----|-------:|:-------------|
 | Asian Cheetah | Misc | 50 | - |
 | Dumped! | Forensics | 100 | - |
-| Kick Tort Teen | Forensics | 50 | [link](WRITE_UP_LINK) |
+| Kick Tort Teen | Forensics | 50 | [link](/forensics/kick_tort_teen) |
 | Rail Fence Cipher | Crypto | 50 | - |
 | We lost the Fashion Flag! | Forensics | 100 | - |
 | dMd | Reverse | 50 | - |
