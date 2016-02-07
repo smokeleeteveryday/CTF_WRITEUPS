@@ -18,7 +18,7 @@ def main():
                 data.append(value)
     print('done')
 
-    with open('result.dump', 'wb') as f:
+    with open('fileXYZ.data', 'wb') as f:
         print('[+] Writing decoded bytes', end='... ')
         f.write(bytes(data))
         print('done')
@@ -27,7 +27,7 @@ def main():
         f.write(bytes([98, 13, 0, 73, 19, 0, 94, 188, 0, 0, 0]))
         print('done')
 
-    print('[+] Done: result.dump')
+    print('[+] Done: fileXYZ.data')
 
 
 if __name__ == '__main__':
