@@ -84,7 +84,7 @@ def main():
         f.write(bytes([98, 13, 0, 73, 19, 0, 94, 188, 0, 0, 0]))
         print('done')
 
-    print('[+] Done: result.dump')
+    print('[+] Done: fileXYZ.data')
 
 
 if __name__ == '__main__':
