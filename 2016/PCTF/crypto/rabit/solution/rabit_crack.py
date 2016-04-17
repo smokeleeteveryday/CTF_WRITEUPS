@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
 # Plaid CTF 2016
-# tonnerre (CRYPTO/200)
+# rabit (CRYPTO/200)
 #
 # @a: Smoke Leet Everyday
 # @u: https://github.com/smokeleeteveryday
