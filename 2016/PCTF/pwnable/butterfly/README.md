@@ -76,9 +76,9 @@ If we do this the epilogue will not properly unwind the stackframe and values fr
 
 Where `0x400863` is the target address and `6` the bit index we wish to flip. Our buffer would look like:
 
-```33571614AAAAAAAABBBBBBBBCCCCCCCCDDDDDDDDEEEEEEEE```
+`33571614AAAAAAAABBBBBBBBCCCCCCCCDDDDDDDDEEEEEEEE`
 
-where ```EEEEEEEE = return address```.
+where `EEEEEEEE = return address`.
 
 We will pick the main function start address `0x400788` as our return address so we can execute the bitflipping exercise again but this time with the modified epilogue. This effectively gives us a situation where we can flip arbitrary bits in the program and redirect control-flow afterwards, a pretty powerful exploitation primitive.
 
