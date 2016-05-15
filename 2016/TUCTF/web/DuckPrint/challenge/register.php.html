@@ -1,0 +1,31 @@
+<html>
+<head>
+<title>Register</title>
+</head>
+<body>
+
+<h1>Duckprint</h1>
+
+<div id='nav'>
+<a href="register.php">Register</a>
+<a href="generate.php">Generate</a>
+<a href="validate.php">Validate</a>
+</div>
+
+<form id='register' action='register.php' method='post'
+    accept-charset='UTF-8'>
+<fieldset >
+<legend>Register</legend>
+<input type='hidden' name='submitted' id='submitted' value='1'/>
+ 
+<label for='username' >Username:</label>
+<input type='text' name='username' id='username' maxlength="50" />
+ 
+<input type='submit' name='Submit' value='Submit' />
+ 
+</fieldset>
+</form>
+
+
+</body>
+</html>
