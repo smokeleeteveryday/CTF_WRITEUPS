@@ -9,4 +9,4 @@ CTFtime event: https://ctftime.org/event/335
 ## Solved
 | Challenge | Type | Points | Write-up     |
 |:----------|:-----|-------:|:-------------|
-| trendyweb | web | 100 (not rewarded due time) | [link](/2016/SECUINSIDE/trendyweb) |
+| trendyweb | web | ~~100~~ | [link](/2016/SECUINSIDE/trendyweb) |
