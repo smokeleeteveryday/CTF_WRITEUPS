@@ -3,7 +3,7 @@
 ## Challenge details
 | Event | Challenge | Category | Points |
 |:------|:----------|:---------|-------:|
-| SECUINSIDE | trendyweb | Web | 100 (not granted because of time) |
+| SECUINSIDE | trendyweb | Web | ~~100~~ 0 |
 
 ### Description
 > Trendy~! Web~
