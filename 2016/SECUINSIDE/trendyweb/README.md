@@ -3,7 +3,9 @@
 ## Challenge details
 | Event | Challenge | Category | Points |
 |:------|:----------|:---------|-------:|
-| SECUINSIDE | trendyweb | Web | ~~100~~ 0 |
+| SECUINSIDE | trendyweb | Web | ~~100~~ 0* |
+
+\**Points were not rewarded due to time.*
 
 ### Description
 > Trendy~! Web~
